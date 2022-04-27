@@ -1,0 +1,9 @@
+stores:
+  - CA
+  - ROOT
+  - MY
+filters:
+  ercot:
+    issuer:
+      - 'Electric Reliability Council of Texas, Inc. CA'
+      - '.*Reliability Council.*'
