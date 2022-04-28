@@ -4,3 +4,8 @@ Ever get tired of scouring machines for certificates?  Get tired of sorting out 
 
 Goal:
 Simply want a way to export relevant certificates and the important data for energy markets (MISO, ERCOT, PJM, SPP) and OATI.
+
+Supported ISOs:
+    ERCOT
+    
+    Others coming shortly.
