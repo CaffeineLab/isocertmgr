@@ -105,7 +105,7 @@ def find_certs(config):
                             continue
                         break
     try:
-        os.startfile('hshshs.csv')
+        os.startfile(export_filename)
     except FileNotFoundError as e:
         logger.info(str(e))
 
