@@ -1,5 +1,9 @@
 # ISO Certificate Manager
-Ever get tired of scouring machines for certificates?  Get tired of sorting out the serial number of the proper cert because Chrome doesn't always display the friendly name?  Well, this tool is for you.
+The ISO Certificate Manager is a configurable python script that searches your local Windows Certificate Stores for any certificates that would grant access to any of the North American ISOs.    
+
+##Parameters
+-m market_code      Any of the following market codes
+                    OATI, MISO, SPP, PJM, ERCOT, NYISO, ISONE, and CAISO
 
 
 Goal:
