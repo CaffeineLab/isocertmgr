@@ -4,15 +4,19 @@ and generating reports/output to aid in certificate renewals.
 """
 import ssl
 import re
+import sys
+import os
 import csv
+import argparse
 import logging
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 import yaml
 
+__author__ = "Caffeine Lab"
+__version__ = "0.3.0"
+__license__ = "GNU General Public License v3.0"
 
-with open('config.yaml', 'r', encoding='utf-8') as fp:
-    config = yaml.load(fp, Loader=yaml.FullLoader)
 
 # create logger
 logger = logging.getLogger('isocertmgr')
@@ -21,49 +25,52 @@ logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
 def parse_cert(cert):
     """Given a certificate, get all of the interesting information we want
-    in order to help manage the renewal process for energy markets."""
-    # pylint: disable=consider-using-f-string
+    in order to help manage the renewal process for energy markets.
 
-    results = {}
+    Currently very ERCOT centric...
+    """
 
     # We'll look for the DUNS number in a few places.  If it exists - store it.
-    results['DUNS'] = re.search(r"DUNS Number - ([0-9]{13})", str(cert.subject))
-    if results['DUNS']:
-        results['DUNS'] = results['DUNS'][1]
+    duns = re.search(r"DUNS Number - ([0-9]{13})", str(cert.subject))
+
+    if duns:
+        duns = '="' + str(duns[1]) + '"'
+
     else:
-        results['DUNS'] = re.search(r"OU=([0-9]{13})", str(cert.subject))
-        if results['DUNS']:
-            results['DUNS'] = results['DUNS'][1]
+        duns = re.search(r"OU=([0-9]{13})", str(cert.subject))
+        if duns:
+            duns = str(duns[1])
 
     # Everything else is straightforward.
-    results.update({
+    results = {
+        'DUNS': duns,
         'Name': cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,
         'Serial Number': '{0:x}'.format(cert.serial_number),
-        'Valid From': cert.not_valid_before,
-        'Valid To': cert.not_valid_after,
+        'Valid From': cert.not_valid_before.strftime('%Y-%m-%d'),
+        'Valid To': cert.not_valid_after.strftime('%Y-%m-%d'),
         'Subject': cert.subject,
         'Organization': cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value
-    })
+    }
 
     return results
 
 
-def find_certs():
+def find_certs(config):
     """Search the local machine stores for certificates and store the
     interesting ones in a .csv file."""
     # pylint: disable=unused-variable
 
     fieldnames = [
+                  'Store',
                   'Market',
+                  'DUNS',
                   'Name',
                   'Issuer',
                   'Serial Number',
-                  'Valid From',
                   'Valid To',
+                  'Valid From',
                   'Subject',
-                  'Organization',
-                  'DUNS',
-                  'Store'
+                  'Organization'
                   ]
 
     export_filename = 'export.csv'
@@ -93,11 +100,54 @@ def find_certs():
                                 'Issuer': issuer,
                                 'Market': market.upper()
                             })
-                            writer.writerow(cert_info)
+                            writer.writerow({k: cert_info[k] for k in fieldnames})
                         else:
                             continue
                         break
+    try:
+        os.startfile('hshshs.csv')
+    except FileNotFoundError as e:
+        logger.info(str(e))
 
 
-if __name__ == '__main__':
-    find_certs()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    # Required positional argument
+    # parser.add_argument("arg", help="Required positional argument")
+
+    # Optional argument flag which defaults to False
+    parser.add_argument("-c", "--config", action="store", dest="config", default=None)
+
+    # Optional verbosity counter (eg. -v, -vv, -vvv, etc.)
+    parser.add_argument('-v', '--verbose', action="count", dest="verbose",
+                        default=2, help="Increase the verbosity. Can be used twice for extra effect.")
+    parser.add_argument('-q', '--quiet', action="count", dest="quiet",
+                        default=0, help="Decrease the verbosity. Can be used twice for extra effect.")
+
+    # Specify output of "--version"
+    parser.add_argument(
+        "--version",
+        action="version",
+        version="%(prog)s (version {version})".format(version=__version__))
+
+    args = parser.parse_args()
+
+    log_levels = [logging.CRITICAL, logging.ERROR, logging.WARNING,
+                  logging.INFO, logging.DEBUG]
+
+    args.verbose = min(args.verbose - args.quiet, len(log_levels) - 1)
+    args.verbose = max(args.verbose, 0)
+    logger.setLevel(log_levels[args.verbose])
+
+    if args.config is not None:
+        try:
+            with open(args.config, 'r', encoding='utf-8') as fp:
+                app_config = yaml.load(fp, Loader=yaml.FullLoader)
+        except FileNotFoundError as e:
+            logger.debug(str(e))
+            sys.exit('Cannot find config file: %s' % args.config)
+    else:
+        sys.exit('For now, you need to have a config file.')
+
+    find_certs(app_config)
