@@ -23,6 +23,24 @@ logger = logging.getLogger('isocertmgr')
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
 
+def get_config(path):
+    """Start with vanilla settings and override them with anything in the yaml file."""
+
+    config = {
+        'stores': ['CA', 'ROOT', 'MY'],
+        'filters': None
+    }
+
+    if path is not None:
+        try:
+            with open(path, 'r', encoding='utf-8') as fp:
+                config.update(yaml.load(fp, Loader=yaml.FullLoader))
+        except FileNotFoundError as e:
+            logger.debug(str(e))
+            sys.exit('Cannot find config file: %s' % args.config)
+    return config
+
+
 def parse_cert(cert):
     """Given a certificate, get all of the interesting information we want
     in order to help manage the renewal process for energy markets.
@@ -41,6 +59,11 @@ def parse_cert(cert):
         if duns:
             duns = str(duns[1])
 
+    try:
+        organization = cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value
+    except IndexError:
+        organization = None
+
     # Everything else is straightforward.
     results = {
         'DUNS': duns,
@@ -49,28 +72,16 @@ def parse_cert(cert):
         'Valid From': cert.not_valid_before.strftime('%Y-%m-%d'),
         'Valid To': cert.not_valid_after.strftime('%Y-%m-%d'),
         'Subject': cert.subject,
-        'Organization': cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value
+        'Organization': organization
     }
 
     return results
 
 
-def find_certs(options):
+def find_certs(config):
     """Search the local machine stores for certificates and store the
     interesting ones in a .csv file."""
     # pylint: disable=unused-variable
-
-    if options.config is not None:
-        try:
-            with open(options.config, 'r', encoding='utf-8') as fp:
-                config = yaml.load(fp, Loader=yaml.FullLoader)
-        except FileNotFoundError as e:
-            logger.debug(str(e))
-            sys.exit('Cannot find config file: %s' % args.config)
-    else:
-        sys.exit('For now, you need to have a config file.')
-
-    config['args'] = args
 
     fieldnames = [
                   'Store',
@@ -95,6 +106,17 @@ def find_certs(options):
             try:
                 issuer = certificate.issuer.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
             except IndexError:
+                continue
+
+            if config['filters'] is None:
+                # keep it
+                cert_info = parse_cert(certificate)
+                cert_info.update({
+                    'Store': store,
+                    'Issuer': issuer,
+                    'Market': None
+                })
+                rows.append(cert_info)
                 continue
 
             # Keep any of the matching issuers
@@ -176,4 +198,7 @@ if __name__ == "__main__":
     args.verbose = max(args.verbose, 0)
     logger.setLevel(log_levels[args.verbose])
 
-    find_certs(args)
+    app_config = get_config(args.config)
+    app_config['args'] = args
+
+    find_certs(app_config)
