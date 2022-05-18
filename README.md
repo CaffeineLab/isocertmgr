@@ -7,4 +7,19 @@ The ISO Certificate Manager is a configurable python script that searches your l
     Any of the following market codes should be configured in the config.yaml file  
     OATI, MISO, SPP, PJM, ERCOT, NYISO, ISONE, webCARES and CAISO  
 
- 
+-c  config_file  
+    path to a .yaml config file specifying filters to help identify certificates.  
+
+-v/-q will increase or decrease the logging level.  
+
+## YAML Config File
+
+Use the template to build your own filters for markets.  
+
+stores - the certificate stores to search.  
+filters  
+    market  
+        field  
+            - list of regexs  
+            - that will identify  
+            - certificates for the market  
