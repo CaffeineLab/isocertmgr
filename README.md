@@ -3,8 +3,8 @@ The ISO Certificate Manager is a configurable python script that searches your l
 
 
 ## Parameters
--m market_code      Any of the following market codes*
+-m  market_code      
+    Any of the following market codes should be configured in the config.yaml file
+    OATI, MISO, SPP, PJM, ERCOT, NYISO, ISONE, webCARES and CAISO
 
-                    OATI, MISO, SPP, PJM, ERCOT, NYISO, ISONE, and CAISO
-
-* Currently only ERCOT is supported in the config file.
+ 
