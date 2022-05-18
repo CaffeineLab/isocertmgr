@@ -18,8 +18,8 @@ Use the template to build your own filters for markets.
 
 stores - the certificate stores to search.  
 filters  
-    market  
-        field  
-            - list of regexs  
-            - that will identify  
-            - certificates for the market  
+&nbsp;&nbsp;market  
+&nbsp;&nbsp;&nbsp;&nbsp;field  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- list of regexs  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- that will identify  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- certificates for the market  
