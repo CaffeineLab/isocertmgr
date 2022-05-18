@@ -16,7 +16,7 @@ The ISO Certificate Manager is a configurable python script that searches your l
 
 Use the template to build your own filters for markets.  
 
-stores - the certificate stores to search.  
+stores - the certificate stores to search.  (Most will be found in 'MY')
 filters  
 &nbsp;&nbsp;market  
 &nbsp;&nbsp;&nbsp;&nbsp;field  
