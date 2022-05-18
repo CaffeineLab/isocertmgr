@@ -4,6 +4,7 @@ The ISO Certificate Manager is a configurable python script that searches your l
 
 ## Parameters
 -m market_code      Any of the following market codes*
+
                     OATI, MISO, SPP, PJM, ERCOT, NYISO, ISONE, and CAISO
 
 * Currently only ERCOT is supported in the config file.
