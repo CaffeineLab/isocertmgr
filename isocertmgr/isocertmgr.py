@@ -55,10 +55,22 @@ def parse_cert(cert):
     return results
 
 
-def find_certs(config):
+def find_certs(options):
     """Search the local machine stores for certificates and store the
     interesting ones in a .csv file."""
     # pylint: disable=unused-variable
+
+    if options.config is not None:
+        try:
+            with open(options.config, 'r', encoding='utf-8') as fp:
+                config = yaml.load(fp, Loader=yaml.FullLoader)
+        except FileNotFoundError as e:
+            logger.debug(str(e))
+            sys.exit('Cannot find config file: %s' % args.config)
+    else:
+        sys.exit('For now, you need to have a config file.')
+
+    config['args'] = args
 
     fieldnames = [
                   'Store',
@@ -74,40 +86,61 @@ def find_certs(config):
                   ]
 
     export_filename = 'export.csv'
-    with open(export_filename, 'w', newline='', encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, delimiter=',',
-                                quotechar='"', quoting=csv.QUOTE_ALL, fieldnames=fieldnames)
 
-        writer.writeheader()
+    rows = []
+    for store in config['stores']:
+        for cert, encoding, trust in ssl.enum_certificates(store):
+            certificate = x509.load_der_x509_certificate(cert, backend=None)
 
-        for store in config['stores']:
-            for cert, encoding, trust in ssl.enum_certificates(store):
-                certificate = x509.load_der_x509_certificate(cert, backend=None)
+            try:
+                issuer = certificate.issuer.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+            except IndexError:
+                continue
 
-                try:
-                    issuer = certificate.issuer.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
-                except IndexError:
+            # Keep any of the matching issuers
+            for market in config['filters']:
+
+                if config['args'].market is not None and market != config['args'].market:
+                    # Skip market filter for this certificate
+                    # since we're filtering for something specific
+                    # and this isn't it.
                     continue
 
-                # Keep any of the matching issuers
-                for market in config['filters']:
+                for issuer_filter in config['filters'][market]['issuer']:
+                    if re.search(issuer_filter, issuer):
+                        cert_info = parse_cert(certificate)
+                        cert_info.update({
+                            'Store': store,
+                            'Issuer': issuer,
+                            'Market': market.upper()
+                        })
+                        rows.append(cert_info)
+                    else:
+                        continue
+                    break
 
-                    for issuer_filter in config['filters'][market]['issuer']:
-                        if re.search(issuer_filter, issuer):
-                            cert_info = parse_cert(certificate)
-                            cert_info.update({
-                                'Store': store,
-                                'Issuer': issuer,
-                                'Market': market.upper()
-                            })
-                            writer.writerow({k: cert_info[k] for k in fieldnames})
-                        else:
-                            continue
-                        break
+    if len(rows) == 0:
+        print('nothing found')
+        return
+
+    try:
+        with open(export_filename, 'w', newline='', encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, delimiter=',',
+                                    quotechar='"', quoting=csv.QUOTE_ALL, fieldnames=fieldnames)
+
+            writer.writeheader()
+            for cert_info in rows:
+                writer.writerow({k: cert_info[k] for k in fieldnames})
+    except PermissionError as e:
+        logger.debug(str(e))
+        print('Cannot write to file - it may be open.')
+        return
+
     try:
         os.startfile(export_filename)
     except FileNotFoundError as e:
         logger.info(str(e))
+        print('Cannot find file - it may not have been written')
 
 
 if __name__ == "__main__":
@@ -118,6 +151,9 @@ if __name__ == "__main__":
 
     # Optional argument flag which defaults to False
     parser.add_argument("-c", "--config", action="store", dest="config", default=None)
+
+    # Optional argument flag which defaults to False
+    parser.add_argument("-m", "--market", action="store", dest="market", default=None)
 
     # Optional verbosity counter (eg. -v, -vv, -vvv, etc.)
     parser.add_argument('-v', '--verbose', action="count", dest="verbose",
@@ -140,14 +176,4 @@ if __name__ == "__main__":
     args.verbose = max(args.verbose, 0)
     logger.setLevel(log_levels[args.verbose])
 
-    if args.config is not None:
-        try:
-            with open(args.config, 'r', encoding='utf-8') as fp:
-                app_config = yaml.load(fp, Loader=yaml.FullLoader)
-        except FileNotFoundError as e:
-            logger.debug(str(e))
-            sys.exit('Cannot find config file: %s' % args.config)
-    else:
-        sys.exit('For now, you need to have a config file.')
-
-    find_certs(app_config)
+    find_certs(args)

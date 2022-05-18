@@ -7,3 +7,6 @@ filters:
     issuer:
       - 'Electric Reliability Council of Texas, Inc. CA'
       - '.*Reliability Council.*'
+  webcares:
+    issuer:
+      - '.*webCARES.*'
