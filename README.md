@@ -10,6 +10,9 @@ The ISO Certificate Manager is a configurable python script that searches your l
 -c  config_file  
     path to a .yaml config file specifying filters to help identify certificates.  
 
+-o  out_file  
+    CSV Filename to be generated.  
+    
 -v/-q will increase or decrease the logging level.  
 
 ## YAML Config File
