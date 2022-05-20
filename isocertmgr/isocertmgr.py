@@ -14,11 +14,10 @@ from cryptography.x509.oid import NameOID
 import yaml
 
 __author__ = "Caffeine Lab"
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __license__ = "GNU General Public License v3.0"
 
 
-# create logger
 logger = logging.getLogger('isocertmgr')
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
@@ -31,33 +30,30 @@ def get_config(path):
         'filters': None
     }
 
-    if path is not None:
-        try:
-            with open(path, 'r', encoding='utf-8') as fp:
-                config.update(yaml.load(fp, Loader=yaml.FullLoader))
-        except FileNotFoundError as e:
-            logger.debug(str(e))
-            sys.exit('Cannot find config file: %s' % args.config)
+    try:
+        with open(path, 'r', encoding='utf-8') as fp:
+            config.update(yaml.load(fp, Loader=yaml.FullLoader))
+    except FileNotFoundError as e:
+        logger.debug(str(e))
+        sys.exit('Cannot find config file: %s' % args.config)
+    except TypeError as e:
+        logger.debug(str(e))
+        logger.debug('Invalid, probably None, path param - roll with vanilla.')
     return config
 
 
 def parse_cert(cert):
     """Given a certificate, get all of the interesting information we want
-    in order to help manage the renewal process for energy markets.
-
-    Currently very ERCOT centric...
-    """
+    in order to help manage the renewal process for energy markets."""
 
     # We'll look for the DUNS number in a few places.  If it exists - store it.
     duns = re.search(r"DUNS Number - ([0-9]{13})", str(cert.subject))
-
     if duns:
         duns = '="' + str(duns[1]) + '"'
-
     else:
         duns = re.search(r"OU=([0-9]{13})", str(cert.subject))
         if duns:
-            duns = str(duns[1])
+            duns = '="' + str(duns[1]) + '"'
 
     try:
         organization = cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value
@@ -65,7 +61,7 @@ def parse_cert(cert):
         organization = None
 
     # Everything else is straightforward.
-    results = {
+    return {
         'DUNS': duns,
         'Name': cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,
         'Serial Number': '{0:x}'.format(cert.serial_number),
@@ -74,8 +70,6 @@ def parse_cert(cert):
         'Subject': cert.subject,
         'Organization': organization
     }
-
-    return results
 
 
 def find_certs(config):
@@ -96,7 +90,10 @@ def find_certs(config):
                   'Organization'
                   ]
 
-    export_filename = 'export.csv'
+    if config['args'].outfile is None:
+        export_filename = 'export.csv'
+    else:
+        export_filename = config['args'].outfile
 
     rows = []
     for store in config['stores']:
@@ -142,9 +139,9 @@ def find_certs(config):
                     break
 
     if len(rows) == 0:
-        print('nothing found')
-        return
+        sys.exit('nothing found')
 
+    # Export the content of rows to a CSV file.
     try:
         with open(export_filename, 'w', newline='', encoding="utf-8") as csvfile:
             writer = csv.DictWriter(csvfile, delimiter=',',
@@ -153,29 +150,31 @@ def find_certs(config):
             writer.writeheader()
             for cert_info in rows:
                 writer.writerow({k: cert_info[k] for k in fieldnames})
+
+        print(f'Exported {len(rows)} rows.')
     except PermissionError as e:
         logger.debug(str(e))
-        print('Cannot write to file - it may be open.')
-        return
+        sys.exit(f'Cannot write to file: {export_filename} - it may be open.')
 
     try:
+        # If we made it this far - just open the file
         os.startfile(export_filename)
     except FileNotFoundError as e:
         logger.info(str(e))
-        print('Cannot find file - it may not have been written')
+        sys.exit('Cannot find file - it may not have been written')
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-
-    # Required positional argument
-    # parser.add_argument("arg", help="Required positional argument")
 
     # Optional argument flag which defaults to False
     parser.add_argument("-c", "--config", action="store", dest="config", default=None)
 
     # Optional argument flag which defaults to False
     parser.add_argument("-m", "--market", action="store", dest="market", default=None)
+
+    # Optional argument flag which defaults to False
+    parser.add_argument("-o", "--outfile", action="store", dest="outfile", default=None)
 
     # Optional verbosity counter (eg. -v, -vv, -vvv, etc.)
     parser.add_argument('-v', '--verbose', action="count", dest="verbose",
